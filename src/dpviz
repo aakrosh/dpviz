@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+
+function usage () {
+    echo "
+usage: dpviz [options] <region> <sample1,sample2,sample3..>  <variants.vcf.gz>
+
+arguments:
+    region : a samtools like string of chromosome:start-stop
+    sample1,sample2,... : comma-separated name of samples that should be included
+    variants.vcf.gz : bgzipped and tabixed VCF file of variants
+
+options:
+    -o : output pdf file [plot.pdf]
+    -f : flank size around the region to be included [10kb]
+    -h : show this message
+    -t : temporary directory for use
+"
+}
+
+# if nothing is asked of, then just print usage
+if test -z "$1"
+    then 
+    usage
+    exit 1
+fi
+
+# set the defaults
+output="plot.pdf"
+flanks="10000"
+tempdir="$TMPDIR"
+
+# parse arguments
+while getopts ":ho:f:t:" opt; do
+    case ${opt} in 
+        h) 
+           usage
+           exit 0
+           ;;
+        o)
+           output="$OPTARG"
+           ;;
+        f)
+           flanks="$OPTARG"
+           ;;
+        t)
+           tempdir="$OPTARG"
+           ;;
+        :)
+           echo "Option -$OPTARG requires an argument."
+           exit 1
+           ;;
+        \?)
+          echo "Invalid option: -$OPTARG" >&2
+          ;;
+    esac
+done
+
+currdir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+region="${@:${OPTIND}:1}"
+samples="${@:$((${OPTIND}+1)):1}"
+vcffile="${@:$((${OPTIND}+2)):1}"
+
+# add the flanks to the region
+chrom=$(echo $region | awk '{split($1,a,":"); print a[1]}')
+start=$(echo $region | awk '{split($1,a,":"); split(a[2],b,"-"); print b[1]}')
+stop=$(echo $region | awk '{split($1,a,":"); split(a[2],b,"-"); print b[2]}')
+start=$((start-flanks))
+stop=$((stop+flanks))
+echo "Region to be plotted is ${chrom}:${start}-${stop}"
+
+# create a temporary directory
+tmpdir=`mktemp -d -q ${tempdir}/temp.XXXXXX`
+
+# use tabix to get the region
+tabix -h ${vcffile} ${chrom}:${start}-${stop} > ${tmpdir}/variants.vcf
+
+# use vcftools to get the region and subset of samples
+smstring=$(echo ${samples} | awk -v FS="," '{for(i = 1; i <= NF; i++) printf "--indv %s ", $i}')
+vcftools --vcf ${tmpdir}/variants.vcf \
+    --remove-indels --remove-filtered-all --geno-depth \
+    --out ${tmpdir}/out ${smstring}
+
+# use ggplot to plot the coverage information
+Rscript --vanilla ${currdir}/plot.R ${output} ${tmpdir}/out.gdepth
+
+rm -rf ${tmpdir}
