@@ -8,8 +8,19 @@ input  = args[2]
 library(ggplot2)
 library(reshape2)
 
+# function to normalize the data
+standardize <- function(z) {
+    colmed <- apply(z, 2, median)
+    rv <- sweep(z, 2, colmed,"/")  #subtracting median expression
+    return(rv)
+}
+options(digits=1)
+
 data = read.table(input, header = T)
 data = data[,-1]
+tmp = standardize(data[,2:ncol(data)])
+data = cbind(data[,1], tmp)
+names(data)[1] = "POS"
 data = melt(data, id.vars = c("POS"))
 
 # maximum coverage I should show in the figure
