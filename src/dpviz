@@ -79,6 +79,13 @@ tabix -h ${vcffile} ${chrom}:${start}-${stop} > ${tmpdir}/variants.vcf
 if [ ${samples} == "all" ]; then
     vcftools --vcf ${tmpdir}/variants.vcf --thin 50 \
     --remove-indels --remove-filtered-all --geno-depth --out ${tmpdir}/out
+elif [[ ${samples} = sample=* ]]; then
+    rnd=${samples:7}
+    echo "Sampling ${rnd} of the samples"
+    smstring=$(bgzip -dc ${vcffile} | grep "^#CHROM" | cut -f 10- | awk -v n=${rnd} '{for(i = 1; i <= NF; i++) if (rand() < n) {printf "--indv %s ", $i}}')
+    vcftools --vcf ${tmpdir}/variants.vcf --thin 50 \
+    --remove-indels --remove-filtered-all --geno-depth \
+    --out ${tmpdir}/out ${smstring}
 else
     smstring=$(echo ${samples} | awk -v FS="," '{for(i = 1; i <= NF; i++) printf "--indv %s ", $i}')
     vcftools --vcf ${tmpdir}/variants.vcf --thin 50 \
