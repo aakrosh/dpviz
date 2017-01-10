@@ -10,7 +10,7 @@ arguments:
     variants.vcf.gz : bgzipped and tabixed VCF file of variants
 
 options:
-    -o : output pdf file [plot.png]
+    -o : output png file [plot.png]
     -f : flank size around the region to be included [10kb]
     -h : show this message
     -t : temporary directory for use
